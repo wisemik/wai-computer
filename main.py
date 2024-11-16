@@ -5,6 +5,9 @@ import sys
 import time
 import logging
 import asyncio
+import openai
+from typing import Any
+from pydantic import BaseModel
 
 from db import (
     clean_all_transcripts_except,
@@ -34,9 +37,64 @@ app = FastAPI()
 # Initialize agent once
 agent_executor = None
 config = None
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Removed UID for simplification
+class Answer(BaseModel):
+    is_advice_request: bool
+    is_image_request: bool
+    is_transfer_funds: bool
+    response_string: str
 
+def categorize_request(request, model="gpt-4o-mini") -> Any | None:
+    print(f"categorize_request: {request}")
+
+    messages = [
+        {
+            "role": "system",
+            "content": """You are an assistant responsible for identifying the type of an initial query. 
+            You will receive a query and must determine which category it belongs to and add response_string 
+            corresponding to the category.
+            
+            1) If the query contains a request to get an advice, return is_advice_request = true, and in 
+            response_string give the requested advice: imagine that you are are a person that is mentioned in request 
+            and give an advice on a requested topic.
+            
+            2) If the query is a request for image creation, return is_image_request = true, and in response_string 
+            store the extended prompt for the image generation. 
+                        
+            3) If the query is a request to transfer fund, return is_transfer_funds = true and in response_string
+            return the query like:
+            Transfer 100 usdc to 0x6236726372367346
+            Transfer 1 000 000 gwei to 0x734737467346
+            If in initial request there is something sounds like usdc, gwei, etc. commot crypto currencies - fix the
+            name to the correct. And if mentioned grandson or something sound like it - change grandson to  
+            0x61813b2a30580DE2695611fCa6a2e38e09E92B7D
+            
+            4) In all other cases just answer the initial request and store the answer to response_string.
+            """
+        },
+        {
+            "role": "user",
+            "content": f"This is the text for categorization:\n\n{request}"
+        }
+    ]
+
+    try:
+        response = openai.beta.chat.completions.parse(model=model,
+                                                      messages=messages,
+                                                      response_format=Answer,
+                                                      )
+        answer_value = response.choices[0].message.parsed
+
+        if answer_value:
+            print(f"Categorized query: {answer_value}")
+            return answer_value
+        else:
+            print(f"Failed to categorize query: {response.choices[0].message.refusal}")
+            return None
+    except Exception as e:
+        print(f"Failed to categorize query: {e}")
+        return None
 
 @app.post('/start')
 async def start_endpoint():
@@ -56,11 +114,21 @@ async def wai_call_endpoint(request: Request):
     return {'message': 'Transcript updated.'}
 
 
-def call_from_transcript(transcript):
+async def call_from_transcript(transcript):
     logging.debug('Entered call_from_transcript function.')
     logging.info(f'Processing Transcript:\n{transcript}')
-    run_chat_mode(agent_executor=agent_executor, config=config, user_input=transcript)
-    logging.debug('Exiting call_from_transcript function.')
+    categorized_request = categorize_request(transcript)
+
+    if categorized_request:
+        if categorized_request.is_image_request:
+            logging.debug('Image request')
+        elif categorized_request.is_advice_request:
+            logging.debug('is_advice_request request')
+        elif categorized_request.is_transfer_funds:
+            logging.debug('is_transfer_funds request')
+        logging.debug("Request (fixed with llm):", categorized_request.response_string)
+        run_chat_mode(agent_executor=agent_executor, config=config, user_input=categorized_request.response_string)
+        logging.debug('Exiting call_from_transcript function.')
 
 
 # Background Task to Process Idle Transcripts
@@ -79,7 +147,7 @@ async def background_task():
             if time_difference > 5:
                 logging.info(f'Processing transcript for session_id: {session_id}.')
                 full_transcript = get_full_transcript(session_id)
-                call_from_transcript(full_transcript)
+                await call_from_transcript(full_transcript)
                 remove_transcript(session_id)
             else:
                 logging.debug(f'Session {session_id} is still active.')
@@ -230,4 +298,9 @@ def set_env_vars_from_dotenv():
 
 if __name__ == "__main__":
     logging.debug('Starting application.')
-    uvicorn.run("main:app", host="0.0.0.0", port=80)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=80,
+        timeout_keep_alive=600
+    )
