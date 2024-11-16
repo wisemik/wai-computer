@@ -127,6 +127,7 @@ async def call_from_transcript(transcript):
         elif categorized_request.is_transfer_funds:
             logging.debug('is_transfer_funds request')
         logging.debug("Request (fixed with llm):", categorized_request.response_string)
+        
         run_chat_mode(agent_executor=agent_executor, config=config, user_input=categorized_request.response_string)
         logging.debug('Exiting call_from_transcript function.')
 
@@ -168,28 +169,30 @@ async def get_pending_messages_endpoint():
     return {'messages': messages}
 
 
-@app.post('/user-message')
+@app.post('/user-message')x
 async def user_message_endpoint(request: Request):
+    logging.debug('user_message_endpoint')
     data = await request.json()
     message = data['message']
-    run_chat_mode(agent_executor=agent_executor, config=config, user_input=message)
+    await call_from_transcript(message)
     return {'message': 'Message received'}
 
 
-@app.post('/ask-llm')
-async def ask_llm_endpoint(request: Request):
-    data = await request.json()
-    question = data.get('question', '')
-    if not question:
-        return {'error': 'Question is required.'}
-    try:
-        llm = ChatOpenAI(model="gpt-4o-mini")
-        response = llm([HumanMessage(content=question)])
-        answer = response.content
-        return {'answer': answer}
-    except Exception as e:
-        logging.error('Error in ask_llm_endpoint.', exc_info=True)
-        return {'error': 'An error occurred while processing your request.'}
+# @app.post('/ask-llm')
+# async def ask_llm_endpoint(request: Request):
+#     logging.debug('ask_llm_endpoint')
+#     data = await request.json()
+#     question = data.get('question', '')
+#     if not question:
+#         return {'error': 'Question is required.'}
+#     try:
+#         llm = ChatOpenAI(model="gpt-4o-mini")
+#         response = llm([HumanMessage(content=question)])
+#         answer = response.content
+#         return {'answer': answer}
+#     except Exception as e:
+#         logging.error('Error in ask_llm_endpoint.', exc_info=True)
+#         return {'error': 'An error occurred while processing your request.'}
 
 
 @app.get('/random-friend')
