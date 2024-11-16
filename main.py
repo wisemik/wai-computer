@@ -43,9 +43,10 @@ class Answer(BaseModel):
     is_advice_request: bool
     is_image_request: bool
     is_transfer_funds: bool
+    is_joke_request: str
     response_string: str
 
-def categorize_request(request, model="gpt-4o-mini") -> Any | None:
+def categorize_request(request, model="gpt-4o") -> Any | None:
     print(f"categorize_request: {request}")
 
     messages = [
@@ -55,14 +56,20 @@ def categorize_request(request, model="gpt-4o-mini") -> Any | None:
             You will receive a query and must determine which category it belongs to and add response_string 
             corresponding to the category.
             
+            Don't miss out!!!!!! is_advice_request, is_image_request, is_joke_request, is_transfer_funds - boolean, 
+            and the responded content is in response_string string !!!!!
+            
             1) If the query contains a request to get an advice, return is_advice_request = true, and in 
             response_string give the requested advice: imagine that you are are a person that is mentioned in request 
-            and give an advice on a requested topic.
+             - use his/her style and give an advice on a requested topic.
             
             2) If the query is a request for image creation, return is_image_request = true, and in response_string 
             store the extended prompt for the image generation. 
+            
+            3) If the query is a request for a joke, return is_joke_request = true, and in response_string 
+            store the joke about Ethereum.  
                         
-            3) If the query is a request to transfer fund, return is_transfer_funds = true and in response_string
+            4) If the query is a request to transfer fund, return is_transfer_funds = true and in response_string
             return the query like:
             Transfer 100 usdc to 0x6236726372367346
             Transfer 1 000 000 gwei to 0x734737467346
@@ -75,7 +82,11 @@ def categorize_request(request, model="gpt-4o-mini") -> Any | None:
             And if mentioned Alice or something sound like it - change Alice to  
             0x15eA00EF924F8aD0efCbB852da63Cc34321ca746
             
-            4) In all other cases just answer the initial request and store the answer to response_string.
+            5) In all other cases just answer the initial request and store the answer to response_string.
+            
+            Don't miss out: is_advice_request, is_image_request, is_joke_request, is_transfer_funds - boolean, 
+            and the responded content is in response_string string. 
+            
             """
         },
         {
@@ -129,6 +140,14 @@ async def call_from_transcript(transcript):
             logging.debug('Image request')
         elif categorized_request.is_advice_request:
             logging.debug('is_advice_request request')
+            add_pending_message(categorized_request.response_string)
+            return
+        elif categorized_request.is_joke_request:
+            logging.debug('is_joke_request request')
+            add_pending_message(categorized_request.response_string)
+            return
+        elif categorized_request.is_transfer_funds:
+            logging.debug('is_transfer_funds request')
         elif categorized_request.is_transfer_funds:
             logging.debug('is_transfer_funds request')
         logging.debug("Request (fixed with llm):", categorized_request.response_string)
@@ -174,7 +193,7 @@ async def get_pending_messages_endpoint():
     return {'messages': messages}
 
 
-@app.post('/user-message')x
+@app.post('/user-message')
 async def user_message_endpoint(request: Request):
     logging.debug('user_message_endpoint')
     data = await request.json()
