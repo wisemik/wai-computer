@@ -67,8 +67,13 @@ def categorize_request(request, model="gpt-4o-mini") -> Any | None:
             Transfer 100 usdc to 0x6236726372367346
             Transfer 1 000 000 gwei to 0x734737467346
             If in initial request there is something sounds like usdc, gwei, etc. commot crypto currencies - fix the
-            name to the correct. And if mentioned grandson or something sound like it - change grandson to  
+            name to the correct.
+            
+            And if mentioned grandson or something sound like it - change grandson to  
             0x61813b2a30580DE2695611fCa6a2e38e09E92B7D
+            
+            And if mentioned Alice or something sound like it - change Alice to  
+            0x15eA00EF924F8aD0efCbB852da63Cc34321ca746
             
             4) In all other cases just answer the initial request and store the answer to response_string.
             """
@@ -127,7 +132,7 @@ async def call_from_transcript(transcript):
         elif categorized_request.is_transfer_funds:
             logging.debug('is_transfer_funds request')
         logging.debug("Request (fixed with llm):", categorized_request.response_string)
-        
+
         run_chat_mode(agent_executor=agent_executor, config=config, user_input=categorized_request.response_string)
         logging.debug('Exiting call_from_transcript function.')
 
