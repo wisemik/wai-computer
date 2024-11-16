@@ -9,11 +9,13 @@ from db import (
     set_last_call_time,
     delete_last_call_time,
     get_full_transcript,
+    r,  # Import Redis instance
 )
 import os
 import sys
 import time
 import logging
+import asyncio
 
 # Configure logging
 logging.basicConfig(
@@ -39,6 +41,7 @@ app = FastAPI()
 # Configure a file to persist the agent's CDP MPC Wallet Data.
 wallet_data_file = "wallet_data.txt"
 
+@app.post('/wai-api-call')
 def wai_call_endpoint(uid: str, data: dict):
     logging.debug(f'Received request for uid: {uid} with data: {data}')
     session_id = data['session_id']
@@ -55,43 +58,47 @@ def wai_call_endpoint(uid: str, data: dict):
     current_time = time.time()
     logging.debug(f'Current time: {current_time}')
 
-    # Get the last call time
-    last_call_time = get_last_call_time(uid, session_id)
-    logging.debug(f'Last call time: {last_call_time}')
-
-    if last_call_time is not None:
-        time_difference = current_time - last_call_time
-        logging.debug(f'Time difference since last call: {time_difference} seconds')
-        if time_difference > 5:
-            logging.info('More than 5 seconds have passed since the last call. Processing transcript.')
-            # Get the full transcript
-            full_transcript = get_full_transcript(uid, session_id)
-            # Process the transcript
-            call_from_transcript(full_transcript)
-            # Delete the transcript and last call time
-            remove_transcript(uid, session_id)
-        else:
-            logging.debug('Less than 5 seconds since last call. Not processing transcript yet.')
-    else:
-        logging.debug('This is the first call for this session.')
-
     # Update the last call time to the current time
     set_last_call_time(uid, session_id, current_time)
     logging.debug(f'Updated last call time for uid: {uid}, session_id: {session_id}')
 
     return {'message': 'I love you Mik'}
 
-# Register the endpoint with FastAPI
-app.post('/wai-api-call')(wai_call_endpoint)
-
 def call_from_transcript(transcript):
     logging.debug('Entered call_from_transcript function.')
     logging.info(f'Processing Transcript:\n{transcript}')
     # Add your processing logic here
     # For example, you might pass the transcript to the agent
-    # agent_executor, config = initialize_agent()
-    # run_chat_mode(agent_executor=agent_executor, config=config, user_input=transcript)
+    agent_executor, config = initialize_agent()
+    run_chat_mode(agent_executor=agent_executor, config=config, user_input=transcript)
     logging.debug('Exiting call_from_transcript function.')
+
+# Background Task to Process Idle Transcripts
+async def background_task():
+    while True:
+        await asyncio.sleep(5)
+        logging.debug('Running background task to check for idle sessions.')
+        # Get all last call times from Redis
+        for key in r.scan_iter('last_call_time:*'):
+            uid_session = key.decode().split(':')[1:]
+            uid = uid_session[0]
+            session_id = uid_session[1]
+            last_call_time = get_last_call_time(uid, session_id)
+            if last_call_time is None:
+                continue
+            current_time = time.time()
+            time_difference = current_time - last_call_time
+            if time_difference > 5:
+                logging.info(f'More than 5 seconds have passed since last call for uid: {uid}, session_id: {session_id}. Processing transcript.')
+                full_transcript = get_full_transcript(uid, session_id)
+                call_from_transcript(full_transcript)
+                remove_transcript(uid, session_id)
+            else:
+                logging.debug(f'Less than 5 seconds since last call for uid: {uid}, session_id: {session_id}. Not processing transcript yet.')
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(background_task())
 
 def initialize_agent():
     """Initialize the agent with CDP Agentkit."""
@@ -144,7 +151,7 @@ def initialize_agent():
             "from the faucet if you are on network ID `base-sepolia`. If not, you can provide your wallet details "
             "and request funds from the user. If someone asks you to do something you can't do with your currently "
             "available tools, you must say so, and encourage them to implement it themselves using the CDP SDK + "
-            "Agentkit, recommend they go to docs.cdp.coinbase.com for more informaton. Be concise and helpful with "
+            "Agentkit, recommend they go to docs.cdp.coinbase.com for more information. Be concise and helpful with "
             "your responses. Refrain from restating your tools' descriptions unless it is explicitly requested."
         ),
     )
@@ -247,7 +254,7 @@ if __name__ == "__main__":
     logging.debug('Starting application.')
     set_env_vars_from_dotenv()
     agent_executor, config = initialize_agent()
-    # You can uncomment the following lines to enable mode selection
+    # Uncomment the following lines if you want to use mode selection
     # mode = choose_mode()
     # if mode == "chat":
     #     user_input = input("\nUser: ")
