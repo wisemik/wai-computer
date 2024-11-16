@@ -43,7 +43,6 @@ class Answer(BaseModel):
     is_advice_request: bool
     is_image_request: bool
     is_transfer_funds: bool
-    is_joke_request: str
     response_string: str
 
 def categorize_request(request, model="gpt-4o") -> Any | None:
@@ -56,7 +55,7 @@ def categorize_request(request, model="gpt-4o") -> Any | None:
             You will receive a query and must determine which category it belongs to and add response_string 
             corresponding to the category.
             
-            Don't miss out!!!!!! is_advice_request, is_image_request, is_joke_request, is_transfer_funds - boolean, 
+            Don't miss out!!!!!! is_advice_request, is_image_request, is_transfer_funds - boolean, 
             and the responded content is in response_string string !!!!!
             
             1) If the query contains a request to get an advice, return is_advice_request = true, and in 
@@ -66,15 +65,15 @@ def categorize_request(request, model="gpt-4o") -> Any | None:
             2) If the query is a request for image creation, return is_image_request = true, and in response_string 
             store the extended prompt for the image generation. 
             
-            3) If the query is a request for a joke, return is_joke_request = true, and in response_string 
-            store the joke about Ethereum.  
-                        
-            4) If the query is a request to transfer fund, return is_transfer_funds = true and in response_string
-            return the query like:
+            3) If the query is a request to transfer fund, return is_transfer_funds = true and in response_string
+            return the query like (ONLY EXAMPLE OF THE FORMAT, NUMBER AND ADDRESS TAKE FROM THE QUERY)
             Transfer 100 usdc to 0x6236726372367346
             Transfer 1 000 000 gwei to 0x734737467346
-            If in initial request there is something sounds like usdc, gwei, etc. commot crypto currencies - fix the
-            name to the correct.
+
+            If in initial request there is something sounds like usdc, gwei (it may sounds like: guy, gui, gve, etc), 
+            etc. commot crypto currencies - fix the name to the correct.
+            
+            If request in gwei convert it to eth (one gwei is 0.000000001 ETH, so for example 1 000 000 gwei = 0.001 Eth)
             
             And if mentioned grandson or something sound like it - change grandson to  
             0x61813b2a30580DE2695611fCa6a2e38e09E92B7D
@@ -82,9 +81,9 @@ def categorize_request(request, model="gpt-4o") -> Any | None:
             And if mentioned Alice or something sound like it - change Alice to  
             0x15eA00EF924F8aD0efCbB852da63Cc34321ca746
             
-            5) In all other cases just answer the initial request and store the answer to response_string.
+            4) In all other cases just store the initial request to response_string.
             
-            Don't miss out: is_advice_request, is_image_request, is_joke_request, is_transfer_funds - boolean, 
+            Don't miss out: is_advice_request, is_image_request, is_transfer_funds - boolean, 
             and the responded content is in response_string string. 
             
             """
@@ -140,17 +139,9 @@ async def call_from_transcript(transcript):
             logging.debug('Image request')
         elif categorized_request.is_advice_request:
             logging.debug('is_advice_request request')
-            add_pending_message(categorized_request.response_string)
-            return
-        elif categorized_request.is_joke_request:
-            logging.debug('is_joke_request request')
-            add_pending_message(categorized_request.response_string)
-            return
         elif categorized_request.is_transfer_funds:
             logging.debug('is_transfer_funds request')
-        elif categorized_request.is_transfer_funds:
-            logging.debug('is_transfer_funds request')
-        logging.debug("Request (fixed with llm):", categorized_request.response_string)
+        # logging.debug("Request (fixed with llm):", categorized_request.response_string)
 
         run_chat_mode(agent_executor=agent_executor, config=config, user_input=categorized_request.response_string)
         logging.debug('Exiting call_from_transcript function.')
