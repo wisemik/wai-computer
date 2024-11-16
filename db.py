@@ -39,7 +39,7 @@ def append_segment_to_transcript(uid: str, session_id: str, new_segments: list[d
     return segments
 
 
-def remove_transcript(uid: str, session_id: str):
+def remove_transcript(uid: str = "BTQXyVbC7SRF9p5D2ceuC9TXDCC3", session_id: str = "BTQXyVbC7SRF9p5D2ceuC9TXDCC3"):
     r.delete(f'transcript:{uid}:{session_id}')
 
 
@@ -48,7 +48,7 @@ def clean_all_transcripts_except(uid: str, session_id: str):
         if key.decode().split(':')[2] != session_id:
             r.delete(key)
 
-def print_full_transcript(uid: str, session_id: str):
+def get_full_transcript(uid: str = "BTQXyVbC7SRF9p5D2ceuC9TXDCC3", session_id: str = "BTQXyVbC7SRF9p5D2ceuC9TXDCC3"):
     key = f'transcript:{uid}:{session_id}'
     segments = r.get(key)
     if not segments:
@@ -64,4 +64,3 @@ def print_full_transcript(uid: str, session_id: str):
         print(full_text)
         return full_text
 
-print_full_transcript("BTQXyVbC7SRF9p5D2ceuC9TXDCC3","BTQXyVbC7SRF9p5D2ceuC9TXDCC3")

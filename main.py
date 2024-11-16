@@ -15,28 +15,6 @@ from langgraph.prebuilt import create_react_agent
 from cdp_langchain.agent_toolkits import CdpToolkit
 from cdp_langchain.utils import CdpAgentkitWrapper
 
-# Configure a file to persist the agent's CDP MPC Wallet Data.
-
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
-
-wallet_data_file = "wallet_data.txt"
-app = FastAPI()
-
-@app.post('/news-checker')
-def news_checker_endpoint(uid: str, data: dict):
-    print(uid, data)
-    session_id = data['session_id']  # use session id in case your plugin needs the whole conversation context
-    new_segments = data['segments']
-    clean_all_transcripts_except(uid, session_id)
-
-    transcript: list[dict] = append_segment_to_transcript(uid, session_id, new_segments)
-    print(transcript)
-    return {'message': 'I love you Mik'}
-
-
 import os
 import sys
 import time
@@ -53,6 +31,28 @@ from cdp_langchain.utils import CdpAgentkitWrapper
 # Configure a file to persist the agent's CDP MPC Wallet Data.
 wallet_data_file = "wallet_data.txt"
 
+# Configure a file to persist the agent's CDP MPC Wallet Data.
+
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+wallet_data_file = "wallet_data.txt"
+app = FastAPI()
+
+@app.post('/wai-api-call')
+def wai_call_endpoint(uid: str, data: dict):
+    print(uid, data)
+    session_id = data['session_id']  # use session id in case your plugin needs the whole conversation context
+    new_segments = data['segments']
+    clean_all_transcripts_except(uid, session_id)
+
+    transcript: list[dict] = append_segment_to_transcript(uid, session_id, new_segments)
+    print(transcript)
+    return {'message': 'I love you Mik'}
+
+def call_from_transcript(transcript):p
 
 def initialize_agent():
     """Initialize the agent with CDP Agentkit."""
@@ -125,29 +125,33 @@ def run_autonomous_mode(agent_executor, config, interval=10):
             sys.exit(0)
 
 
+
 # Chat Mode
-def run_chat_mode(agent_executor, config):
+def run_chat_mode(agent_executor, config, user_input):
     """Run the agent interactively based on user input."""
     print("Starting chat mode... Type 'exit' to end.")
-    while True:
-        try:
-            user_input = input("\nUser: ")
-            if user_input.lower() == "exit":
-                break
 
-            # Run agent with the user's input in chat mode
-            for chunk in agent_executor.stream(
-                {"messages": [HumanMessage(content=user_input)]}, config
-            ):
-                if "agent" in chunk:
-                    print(chunk["agent"]["messages"][0].content)
-                elif "tools" in chunk:
-                    print(chunk["tools"]["messages"][0].content)
-                print("-------------------")
+    try:
+        # user_input = input("\nUser: ")
+        if user_input.lower() == "exit":
+            return
 
-        except KeyboardInterrupt:
-            print("Goodbye Agent!")
-            sys.exit(0)
+        # Run agent with the user's input in chat mode
+        for chunk in agent_executor.stream(
+            {"messages": [HumanMessage(content=user_input)]}, config
+        ):
+            if "agent" in chunk:
+                print(chunk["agent"]["messages"][0].content)
+            elif "tools" in chunk:
+                print(chunk["tools"]["messages"][0].content)
+            print("-------------------")
+
+    except KeyboardInterrupt:
+        print("Goodbye Agent!")
+        sys.exit(0)
+
+
+
 
 
 # Mode Selection
@@ -190,5 +194,5 @@ def set_env_vars_from_dotenv():
 if __name__ == "__main__":
     set_env_vars_from_dotenv()
     agent_executor, config = initialize_agent()
-    run_autonomous_mode(agent_executor=agent_executor, config=config)
+    # run_chat_mode(agent_executor=agent_executor, config=config)
     uvicorn.run("main:app", host="0.0.0.0", port=80, reload=True)
