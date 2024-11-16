@@ -5,7 +5,10 @@ from db import clean_all_transcripts_except, append_segment_to_transcript, remov
 import os
 import sys
 import time
-
+from db import (
+    clean_all_transcripts_except, append_segment_to_transcript, remove_transcript,
+    get_last_call_time, set_last_call_time, delete_last_call_time
+)
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
@@ -44,15 +47,41 @@ app = FastAPI()
 @app.post('/wai-api-call')
 def wai_call_endpoint(uid: str, data: dict):
     print(uid, data)
-    session_id = data['session_id']  # use session id in case your plugin needs the whole conversation context
+    session_id = data['session_id']
     new_segments = data['segments']
     clean_all_transcripts_except(uid, session_id)
 
+    # Append the new segments to the transcript
     transcript: list[dict] = append_segment_to_transcript(uid, session_id, new_segments)
     print(transcript)
+
+    # Get the current time
+    current_time = time.time()
+
+    # Get the last call time
+    last_call_time = get_last_call_time(uid, session_id)
+
+    if last_call_time is not None:
+        time_difference = current_time - last_call_time
+        if time_difference > 5:
+            # More than 5 seconds have passed since the last call
+            # Get the full transcript
+            full_transcript = get_full_transcript(uid, session_id)
+            # Process the transcript
+            call_from_transcript(full_transcript)
+            # Delete the transcript and last call time
+            remove_transcript(uid, session_id)
+    else:
+        # This is the first call
+        pass
+
+    # Update the last call time to the current time
+    set_last_call_time(uid, session_id, current_time)
+
     return {'message': 'I love you Mik'}
 
-def call_from_transcript(transcript):p
+def call_from_transcript(transcript):
+    print("Call: ", transcript)
 
 def initialize_agent():
     """Initialize the agent with CDP Agentkit."""

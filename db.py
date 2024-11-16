@@ -39,14 +39,18 @@ def append_segment_to_transcript(uid: str, session_id: str, new_segments: list[d
     return segments
 
 
-def remove_transcript(uid: str = "BTQXyVbC7SRF9p5D2ceuC9TXDCC3", session_id: str = "BTQXyVbC7SRF9p5D2ceuC9TXDCC3"):
+def remove_transcript(uid: str, session_id: str):
     r.delete(f'transcript:{uid}:{session_id}')
+    delete_last_call_time(uid, session_id)
 
 
 def clean_all_transcripts_except(uid: str, session_id: str):
     for key in r.scan_iter(f'transcript:{uid}:*'):
         if key.decode().split(':')[2] != session_id:
             r.delete(key)
+            # Also delete the last call time for that session
+            last_call_time_key = f'last_call_time:{uid}:{key.decode().split(":")[2]}'
+            r.delete(last_call_time_key)
 
 def get_full_transcript(uid: str = "BTQXyVbC7SRF9p5D2ceuC9TXDCC3", session_id: str = "BTQXyVbC7SRF9p5D2ceuC9TXDCC3"):
     key = f'transcript:{uid}:{session_id}'
@@ -64,3 +68,20 @@ def get_full_transcript(uid: str = "BTQXyVbC7SRF9p5D2ceuC9TXDCC3", session_id: s
         print(full_text)
         return full_text
 
+# db.py
+
+def get_last_call_time(uid: str, session_id: str):
+    key = f'last_call_time:{uid}:{session_id}'
+    timestamp = r.get(key)
+    if timestamp:
+        return float(timestamp)
+    else:
+        return None
+
+def set_last_call_time(uid: str, session_id: str, timestamp: float):
+    key = f'last_call_time:{uid}:{session_id}'
+    r.set(key, str(timestamp))
+
+def delete_last_call_time(uid: str, session_id: str):
+    key = f'last_call_time:{uid}:{session_id}'
+    r.delete(key)
